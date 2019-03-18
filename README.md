@@ -1,5 +1,5 @@
 # opencv-kalman-tracking
-Use Kalman Filter to track a fish 
+Use Kalman Filter tracking a fish 
 >## Devolope Tools
 > 1.  opencv 3.1
 > 2.  visual studio 2015
