@@ -1,5 +1,5 @@
 # Opencv Kalman Tracking
-To use Kalman Filter to track a fish underwater
+Use kalman filter to track a fish underwater
 ### Getting Started
 These programs utilize hue to measure the position of the fish and track it right away.
 ### Running the tests
