@@ -9,19 +9,14 @@
 
 // Module "video"
 #include <opencv2/video/video.hpp>
-
-// Output
 #include <iostream>
-
-// Vector
 #include <vector>
 
 using namespace std;
 
-// >>>>> Color to be tracked
+// Color to be tracked
 #define MIN_H_BLUE 200
 #define MAX_H_BLUE 300
-// <<<<< Color to be tracked
 
 
 int main()
@@ -29,7 +24,7 @@ int main()
 	// Camera frame
 	cv::Mat frame;
 
-	// >>>> Kalman Filter
+	// Kalman Filter
 	int stateSize = 6;
 	int measSize = 4;
 	int contrSize = 0;
@@ -39,17 +34,30 @@ int main()
 
 	cv::Mat state(stateSize, 1, type);  // [x,y,v_x,v_y,w,h]
 	cv::Mat meas(measSize, 1, type);    // [z_x,z_y,z_w,z_h]
+    // The vector [x,y,v_x,v_y,w,h] 
+
+    // x, y: center point of the 物件
+    // v_x, v_y: 速度 (pixel/sec)
+    // w, h: size of the bounding box
+    
+
+    // The “measure vector” [z_x,z_y,z_w,z_h]
+
+    // z_x, z_y: centroid of the 預測物件
+    // z_w, z_h: size of the 預測物件
+
+
+
+
+
+
+
+
 	//cv::Mat procNoise(stateSize, 1, type)
 	// [E_x,E_y,E_v_x,E_v_y,E_w,E_h]
 
 	// Transition State Matrix A
 	// Note: set dT at each processing step!
-	// [ 1 0 dT 0  0 0 ]
-	// [ 0 1 0  dT 0 0 ]
-	// [ 0 0 1  0  0 0 ]
-	// [ 0 0 0  1  0 0 ]
-	// [ 0 0 0  0  1 0 ]
-	// [ 0 0 0  0  0 1 ]
 	cv::setIdentity(kf.transitionMatrix);
 
 	// Measure Matrix H
@@ -80,21 +88,25 @@ int main()
 
 	// Measures Noise Covariance Matrix R
 	cv::setIdentity(kf.measurementNoiseCov, cv::Scalar(1e-1));
-	// <<<< Kalman Filter
+	// <<<< Kalman Filter >>>> 
 
 	// Camera Index
 	int idx = 0;
 
-	// Camera Capture
-	cv::VideoCapture cap("C:/Users/user/Pictures/Fish/V_20170206_224226.mp4");
-
+	// Camera
+	cv::VideoCapture cap("./video.mp4");
+    
+    if (!cap.open(idx))
+    {
+        cout << "Camera not connected.\n";
+        return EXIT_FAILURE;
+    }
 	
 
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 1024);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 576);
-	// <<<<< Camera Settings
 
-	cout << "\nHit 'q' to exit...\n";
+	
 
 	char ch = 0;
 
@@ -103,7 +115,9 @@ int main()
 
 	int notFoundCount = 0;
 
-	// >>>>> Main loop
+    cout << "\nHit 'q' to exit...\n";
+
+
 	while (ch != 'q' && ch != 'Q')
 	{
 		double precTick = ticks;
@@ -118,6 +132,8 @@ int main()
 		cv::Mat res;
 		frame.copyTo(res);
 
+
+        // Found 2nd Frame
 		if (found)
 		{
 			// >>>> Matrix A
@@ -144,32 +160,37 @@ int main()
 			cv::rectangle(res, predRect, CV_RGB(255, 0, 0), 2);
 		}
 
-		// >>>>> Noise smoothing
+		// Noise smoothing
 		cv::Mat blur;
 		cv::GaussianBlur(frame, blur, cv::Size(5, 5), 3.0, 3.0);
-		// <<<<< Noise smoothing
+		// <<<<< Noise smoothing  >>>>>
 
-		// >>>>> HSV conversion
+		// HSV conversion 選取顏色
 		cv::Mat frmHsv;
 		cv::cvtColor(blur, frmHsv, CV_BGR2HSV);
-		// <<<<< HSV conversion
+		// <<<<< HSV conversion >>>>>>>
+
 		cv::Mat mask1, mask2;
 		cv::inRange(frmHsv, cv::Scalar(0, 70, 50), cv::Scalar(10, 255, 255), mask1);
 		cv::inRange(frmHsv, cv::Scalar(170, 70, 50), cv::Scalar(180, 255, 255), mask2);
 
 		
-		// >>>>> Color Thresholding
+		// Color Thresholding  取出對應的顏色色塊
 		// Note: change parameters for different colors
 		cv::Mat rangeRes = cv::Mat::zeros(frame.size(), CV_8UC1);
 		
 
 		rangeRes = mask1 | mask2;
-		// <<<<< Color Thresholding
+		// <<<<< Color Thresholding  >>>>>>
 
-		// >>>>> Improving the result
+
+
+
+
+		// Improving the result   消融 and 補強顏色
 		cv::erode(rangeRes, rangeRes, cv::Mat(), cv::Point(-1, -1), 2);
 		cv::dilate(rangeRes, rangeRes, cv::Mat(), cv::Point(-1, -1), 2);
-		// <<<<< Improving the result
+		// <<<<< Improving the result >>>>>>
 
 		// Thresholding viewing
 		cv::imshow("Threshold", rangeRes);
@@ -180,9 +201,12 @@ int main()
 			CV_CHAIN_APPROX_NONE);
 		// <<<<< Contours detection
 		
+
+
+        
 		// >>>>> Filtering
-		vector<vector<cv::Point> > balls;
-		vector<cv::Rect> ballsBox;
+		vector<vector<cv::Point> > rolls;
+		vector<cv::Rect> rollsBox;
 		for (size_t i = 0; i < contours.size(); i++)
 		{
 			cv::Rect bBox;
@@ -196,23 +220,23 @@ int main()
 
 			if (bBox.area() >= 800)
 			{
-				balls.push_back(contours[i]);
-				ballsBox.push_back(bBox);
+				rolls.push_back(contours[i]);
+				rollsBox.push_back(bBox);
 			}
 		}
 		// <<<<< Filtering
 
-		cout << "Balls found:" << ballsBox.size() << endl;
+		cout << "Animal rolls:" << rollsBox.size() << endl;
 
 		// >>>>> Detection result
-		for (size_t i = 0; i < balls.size(); i++)
+		for (size_t i = 0; i < rolls.size(); i++)
 		{
-			cv::drawContours(res, balls, i, CV_RGB(20, 150, 20), 1);
-			cv::rectangle(res, ballsBox[i], CV_RGB(0, 255, 0), 2);
+			cv::drawContours(res, rolls, i, CV_RGB(20, 150, 20), 1);
+			cv::rectangle(res, rollsBox[i], CV_RGB(0, 255, 0), 2);
 
 			cv::Point center;
-			center.x = ballsBox[i].x + ballsBox[i].width / 2;
-			center.y = ballsBox[i].y + ballsBox[i].height / 2;
+			center.x = rollsBox[i].x + rollsBox[i].width / 2;
+			center.y = rollsBox[i].y + rollsBox[i].height / 2;
 			cv::circle(res, center, 2, CV_RGB(20, 150, 20), -1);
 
 			stringstream sstr;
@@ -238,10 +262,10 @@ int main()
 		{
 			notFoundCount = 0;
 
-			meas.at<float>(0) = ballsBox[0].x + ballsBox[0].width / 2;
-			meas.at<float>(1) = ballsBox[0].y + ballsBox[0].height / 2;
-			meas.at<float>(2) = (float)ballsBox[0].width;
-			meas.at<float>(3) = (float)ballsBox[0].height;
+			meas.at<float>(0) = rollsBox[0].x + rollsBox[0].width / 2;
+			meas.at<float>(1) = rollsBox[0].y + rollsBox[0].height / 2;
+			meas.at<float>(2) = (float)rollsBox[0].width;
+			meas.at<float>(3) = (float)rollsBox[0].height;
 
 			if (!found) // First detection!
 			{
